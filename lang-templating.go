@@ -160,17 +160,63 @@ func MakeMessageFromKey(key, comment string, argv ...string) (m *Message) {
 	return
 }
 
+type parseTranlatorCommentState struct {
+	skipOnce    bool
+	skipMany    int
+	comment     string
+	commentOpen bool
+	source      string
+	sourceOpen  bool
+	comments    []string
+	sources     []string
+}
+
+func (state *parseTranlatorCommentState) processComment(idx, last int, this, next rune) (handled bool) {
+	if handled = state.commentOpen; handled {
+		if state.skipOnce = this == '*' && idx < last && next == '/'; state.skipOnce {
+			state.comments = append(state.comments, strings.TrimSpace(state.comment))
+			state.commentOpen = false
+			state.comment = ""
+			return
+		}
+		state.comment += string(this)
+	}
+	return
+}
+
+func (state *parseTranlatorCommentState) processSource(idx, last int, this, next rune) (handled bool) {
+	if handled = state.sourceOpen; handled {
+		if state.skipOnce = this == ',' && idx < last && next == ' '; state.skipOnce {
+			state.sources = append(state.sources, strings.TrimSpace(state.source))
+			state.source = ""
+			return
+		} else if this == ']' {
+			state.sources = append(state.sources, strings.TrimSpace(state.source))
+			state.sourceOpen = false
+			state.source = ""
+			return
+		}
+		state.source += string(this)
+	}
+	return
+}
+
+func (state *parseTranlatorCommentState) process(idx, last int, this, next rune, input string) {
+	if state.processComment(idx, last, this, next) {
+	} else if state.processSource(idx, last, this, next) {
+	} else if state.skipOnce = this == '/' && idx < last && next == '*'; state.skipOnce {
+		state.commentOpen = true
+	} else if this == '[' && idx+6 < last && input[idx:idx+7] == "[from: " {
+		state.sourceOpen = true
+		state.skipMany = 6
+	}
+	return
+}
+
 func ParseTranslatorComment(input string) (comments, sources []string) {
 	// /* screen reader only *//* screen reader only */\n[from: layouts/partials/footer.tmpl, path/file.name...]
 
-	state := struct {
-		skipOnce    bool
-		skipMany    int
-		comment     string
-		commentOpen bool
-		source      string
-		sourceOpen  bool
-	}{}
+	state := &parseTranlatorCommentState{}
 
 	last := len(input) - 1
 	for idx, this := range input {
@@ -185,47 +231,12 @@ func ParseTranslatorComment(input string) (comments, sources []string) {
 			continue
 		}
 
-		var next uint8
+		var next rune
 		if idx < last {
-			next = input[idx+1]
+			next = rune(input[idx+1])
 		}
 
-		if state.commentOpen {
-			if state.skipOnce = this == '*' && idx < last && next == '/'; state.skipOnce {
-				comments = append(comments, strings.TrimSpace(state.comment))
-				state.commentOpen = false
-				state.comment = ""
-				continue
-			}
-			state.comment += string(this)
-			continue
-		}
-
-		if state.sourceOpen {
-			if state.skipOnce = this == ',' && idx < last && next == ' '; state.skipOnce {
-				sources = append(sources, strings.TrimSpace(state.source))
-				state.source = ""
-				continue
-			} else if this == ']' {
-				sources = append(sources, strings.TrimSpace(state.source))
-				state.sourceOpen = false
-				state.source = ""
-				continue
-			}
-			state.source += string(this)
-			continue
-		}
-
-		if state.skipOnce = this == '/' && idx < last && next == '*'; state.skipOnce {
-			state.commentOpen = true
-			continue
-		}
-
-		if this == '[' && idx+6 < last && input[idx:idx+7] == "[from: " {
-			state.sourceOpen = true
-			state.skipMany = 6
-			continue
-		}
+		state.process(idx, last, this, next, input)
 
 	}
 
@@ -270,13 +281,45 @@ type parseMessageState struct {
 	comment string
 }
 
-func ParseTemplateMessages(input string) (msgs []*Message, err error) {
+func (state *parseMessageState) process(s scanner.Scanner) (ok bool) {
+	ok = true
+	for tok := s.Scan(); tok != scanner.EOF; tok = s.Scan() {
+		token := s.TokenText()
+		if state.format == "" {
+			if size := len(token); size > 2 {
+				if clstrings.IsQuoted(token) {
+					state.format = clstrings.TrimQuotes(token)
+				} else {
+					// variable translation
+					ok = false
+					return
+				}
+			}
+		} else if strings.HasPrefix(token, "/*") {
+			if state.comment != "" {
+				state.comment += "\n"
+			}
+			state.comment += token
+		} else if clstrings.IsQuoted(token) {
+			// support quoted string arguments
+			state.argv = append(state.argv, clstrings.TrimQuotes(token))
+		} else {
+			if argc := len(state.argv); argc > 0 {
+				switch state.argv[argc-1] {
+				case "$", ".":
+					state.argv[argc-1] += token
+				default:
+					state.argv = append(state.argv, token)
+				}
+			} else {
+				state.argv = append(state.argv, token)
+			}
+		}
+	}
+	return
+}
 
-	// TODO: implement support for inline template statements
-	//       example: _ "the message: %[1]s" (printf "not working yet")
-	//       error: placeholders are "Printf" and "NotWorkingYet", even though there is only one replacement verb
-
-	var pruned []string
+func pruneTemplateMessages(input string) (pruned []string) {
 	for _, item := range parseTmplStatements(input) {
 		if strings.HasPrefix(item, "_ ") {
 			item = item[2:]
@@ -286,9 +329,10 @@ func ParseTemplateMessages(input string) (msgs []*Message, err error) {
 			pruned = append(pruned, item)
 		}
 	}
+	return
+}
 
-	var list []*parseMessageState
-
+func parseMessageStateList(pruned []string) (list []*parseMessageState) {
 	for _, item := range pruned {
 		var s scanner.Scanner
 		s.Init(strings.NewReader(item))
@@ -308,54 +352,34 @@ func ParseTemplateMessages(input string) (msgs []*Message, err error) {
 		}
 
 		state := &parseMessageState{}
-
-		for tok := s.Scan(); tok != scanner.EOF; tok = s.Scan() {
-			token := s.TokenText()
-			if state.format == "" {
-				if size := len(token); size > 2 {
-					if clstrings.IsQuoted(token) {
-						state.format = clstrings.TrimQuotes(token)
-					} else {
-						// variable translation
-						state = nil
-						break
-					}
-				}
-			} else if strings.HasPrefix(token, "/*") {
-				if state.comment != "" {
-					state.comment += "\n"
-				}
-				state.comment += token
-			} else if clstrings.IsQuoted(token) {
-				// support quoted string arguments
-				state.argv = append(state.argv, clstrings.TrimQuotes(token))
-			} else {
-				if argc := len(state.argv); argc > 0 {
-					switch state.argv[argc-1] {
-					case "$", ".":
-						state.argv[argc-1] += token
-					default:
-						state.argv = append(state.argv, token)
-					}
-				} else {
-					state.argv = append(state.argv, token)
-				}
-			}
-		}
-
-		if state != nil {
+		if state.process(s) {
 			list = append(list, state)
 		}
 	}
 
-	var order []string
-	unique := make(map[string][]*parseMessageState)
+	return
+}
+
+func parseUniqueOrderMessages(list []*parseMessageState) (unique map[string][]*parseMessageState, order []string) {
+	unique = make(map[string][]*parseMessageState)
 	for _, item := range list {
 		if _, present := unique[item.format]; !present {
 			order = append(order, item.format)
 		}
 		unique[item.format] = append(unique[item.format], item)
 	}
+	return
+}
+
+func ParseTemplateMessages(input string) (msgs []*Message, err error) {
+
+	// TODO: implement support for inline template statements
+	//       example: _ "the message: %[1]s" (printf "not working yet")
+	//       error: placeholders are "Printf" and "NotWorkingYet", even though there is only one replacement verb
+
+	pruned := pruneTemplateMessages(input)
+	list := parseMessageStateList(pruned)
+	unique, order := parseUniqueOrderMessages(list)
 
 	for _, key := range order {
 		items, _ := unique[key]
