@@ -17,7 +17,7 @@ package lang
 import (
 	"fmt"
 
-	"github.com/go-enjin/golang-org-x-text/language"
+	"github.com/go-corelibs/x-text/language"
 )
 
 func ParseTag(input interface{}) (tag language.Tag, err error) {

@@ -15,7 +15,7 @@
 package lang
 
 import (
-	"github.com/go-enjin/golang-org-x-text/language"
+	"github.com/go-corelibs/x-text/language"
 )
 
 type Tags []language.Tag

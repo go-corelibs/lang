@@ -19,7 +19,7 @@ import (
 
 	"github.com/maruel/natural"
 
-	"github.com/go-enjin/golang-org-x-text/language"
+	"github.com/go-corelibs/x-text/language"
 )
 
 func SortedLanguageTagKeys[V interface{}](m map[language.Tag]V) (sorted []language.Tag) {
