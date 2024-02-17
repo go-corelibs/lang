@@ -15,18 +15,99 @@
 package lang
 
 import (
-	"regexp"
+	"strings"
+
+	clStrings "github.com/go-corelibs/strings"
 )
 
-var (
-	//rxGoComments                 = regexp.MustCompile(`(?ms)\{\{\s*/\*.+?\*/\s*\}\}`)
-	rxTranslatorInlineComments   = regexp.MustCompile(`(?ms)\((\s*_\s+.+?\s*)/\*.+?\*/\s*\)`)
-	rxTranslatorPipelineComments = regexp.MustCompile(`(?ms)\{\{(-??\s*_\s+.+?\s*)/\*.+?\*/(\s*-??)}}`)
-)
-
-func PruneTranslatorComments(raw string) (clean string) {
-	clean = rxTranslatorInlineComments.ReplaceAllString(raw, `(${1})`)
-	clean = rxTranslatorPipelineComments.ReplaceAllString(clean, `{{${1}${2}}}`)
-	//clean = rxGoComments.ReplaceAllString(clean, "")
+func startsWithUnderscore(input string) (ok bool) {
+	if v := strings.TrimSpace(input); len(v) >= 2 {
+		ok = v[:2] == "_ "
+	}
 	return
+}
+
+func endsWithCloseComment(input string) (ok bool) {
+	v := strings.TrimSpace(input)
+	if size := len(v); size >= 2 {
+		ok = v[size-2:] == "*/"
+	}
+	return
+}
+
+func PruneCommandTranslatorComments(raw string) (clean string) {
+	remainder := raw
+	var stack []string
+	for {
+		if before, middle, after, found := clStrings.ScanCarve(remainder, "{{", "}}"); found {
+			stack = append(stack, before)
+			var sDash, eDash string
+			if strings.HasPrefix(middle, "-") {
+				sDash = "-"
+				middle = middle[1:]
+			}
+			if strings.HasSuffix(middle, "-") {
+				eDash = "-"
+				middle = middle[:len(middle)-1]
+			}
+			if startsWithUnderscore(middle) && endsWithCloseComment(middle) {
+				if idx := strings.Index(middle, "/*"); idx >= 0 {
+					stack = append(stack, "{{"+sDash+middle[:idx]+eDash+"}}")
+				} else {
+					stack = append(stack, "{{"+sDash+middle+eDash+"}}")
+				}
+			} else {
+				stack = append(stack, "{{"+sDash+middle+eDash+"}}")
+			}
+			remainder = after
+			continue
+		}
+		stack = append(stack, remainder)
+		break
+	}
+	clean = strings.Join(stack, "")
+	return
+}
+
+func PruneInlineTranslatorComments(raw string) (clean string) {
+	remainder := raw
+	var stack []string
+	for {
+		if before, middle, after, found := clStrings.ScanCarve(remainder, "{{", "}}"); found {
+			stack = append(stack, before+"{{")
+			var mStack []string
+			mRemainder := middle[:]
+			for {
+				if b, m, a, f := clStrings.ScanCarve(mRemainder, "(", ")"); f {
+					mStack = append(mStack, b)
+					if startsWithUnderscore(m) && endsWithCloseComment(m) {
+						if idx := strings.Index(m, "/*"); idx >= 0 {
+							mStack = append(mStack, "("+m[:idx]+")")
+						} else {
+							mStack = append(mStack, "("+m+")")
+						}
+					} else {
+						mStack = append(mStack, "("+m+")")
+					}
+					mRemainder = a
+					continue
+				}
+				mStack = append(mStack, mRemainder)
+				break
+			}
+			stack = append(stack, strings.Join(mStack, ""))
+			stack = append(stack, "}}")
+			remainder = after
+			continue
+		}
+		break
+	}
+	clean = strings.Join(stack, "") + remainder
+	return
+}
+
+func PruneTranslatorComments(input string) (clean string) {
+	return PruneCommandTranslatorComments(
+		PruneInlineTranslatorComments(input),
+	)
 }
