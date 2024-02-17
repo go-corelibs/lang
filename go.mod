@@ -4,8 +4,8 @@ go 1.21.6
 
 require (
 	github.com/go-corelibs/fmtstr v1.2.0
-	github.com/go-corelibs/slices v1.3.0
-	github.com/go-corelibs/strings v1.1.1
+	github.com/go-corelibs/slices v1.4.0
+	github.com/go-corelibs/strings v1.5.0
 	github.com/go-corelibs/x-text v0.14.1
 	github.com/maruel/natural v1.1.1
 )

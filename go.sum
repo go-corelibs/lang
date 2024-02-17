@@ -9,10 +9,10 @@ github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/go-corelibs/fmtstr v1.2.0 h1:4OI9aT8zz4nBiQL3Xhi8LFmNeAeT8IUZroVVrg8Ew/I=
 github.com/go-corelibs/fmtstr v1.2.0/go.mod h1:bxaIqxRRkTQ/R4IdcpTX+yKaQYVP1DtU7xj7/17VPeE=
-github.com/go-corelibs/slices v1.3.0 h1:1czJgGhW/F2hRiCRat1O9R/OOaDWixFJwxXfb5rDOfw=
-github.com/go-corelibs/slices v1.3.0/go.mod h1:vdScCtnJXNqPRvERHAzV/6BvUb9G+1YVYioUkWe801c=
-github.com/go-corelibs/strings v1.1.1 h1:noBgP761v4O8UIGLRrWylbgYEYNEOLd0t22e1FxIctQ=
-github.com/go-corelibs/strings v1.1.1/go.mod h1:9mNooTBL4JeqZXMVyKTNnNrpowW/qOpQ+XHUW55uyb4=
+github.com/go-corelibs/slices v1.4.0 h1:Z2Bguav1goQRYY6RkvCyvWzRErCUjmy2GBTZkLs5YJE=
+github.com/go-corelibs/slices v1.4.0/go.mod h1:bpEP0I/j/W7ckYJbzvPZ7pUAC89wSGkvZGzhAr50wSA=
+github.com/go-corelibs/strings v1.5.0 h1:qOlHuFd1DsvjzEQvS4dUEYpNX/z7QKFkmvQzVDFsPuU=
+github.com/go-corelibs/strings v1.5.0/go.mod h1:dGb84vqPSHIWEwIBu9gQ5xuQ+ceEdJr8QF2ohiHmt34=
 github.com/go-corelibs/x-text v0.14.1 h1:ii+NBlwjLJnBM5+Po0MHtuovycuIy0PehiN/gkqG9nI=
 github.com/go-corelibs/x-text v0.14.1/go.mod h1:vU9x7BOiIBFzJiL8mJN4WlNOGhPDkJiJpETTUHFqIXo=
 github.com/golang/protobuf v1.3.1/go.mod h1:6lQm79b+lXiMfvg/cZm0SGofjICqVBUtrP5yJMmIC1U=
